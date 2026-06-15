@@ -165,12 +165,21 @@ export class Controller {
         logger.info(`Currently ${deviceCount} devices are joined.`);
 
         // MQTT
-        try {
-            await this.mqtt.connect();
-        } catch (error) {
-            logger.error(`MQTT failed to connect, exiting... (${(error as Error).message})`);
-            await this.zigbee.stop();
-            return await this.exit(1);
+        if (settings.get().mqtt.enabled) {
+            try {
+                await this.mqtt.connect();
+            } catch (error) {
+                logger.error(`MQTT failed to connect, exiting... (${(error as Error).message})`);
+                await this.zigbee.stop();
+                return await this.exit(1);
+            }
+        } else {
+            if (!settings.get().frontend.enabled) {
+                logger.error("MQTT and Frontend are both disabled, process is unable to start, exiting...");
+                await this.zigbee.stop();
+                return await this.exit(1);
+            }
+            logger.info("MQTT is disabled, skipping connection");
         }
 
         if (abortSignal.aborted) {
@@ -360,7 +369,9 @@ export class Controller {
 
         // Wrap-up
         this.state.stop();
-        await this.mqtt.disconnect();
+        if (settings.get().mqtt.enabled) {
+            await this.mqtt.disconnect();
+        }
 
         try {
             await this.zigbee.stop();

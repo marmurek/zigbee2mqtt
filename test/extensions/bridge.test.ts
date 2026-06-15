@@ -311,6 +311,7 @@ describe("Extension: Bridge", () => {
                         },
                     },
                     mqtt: {
+                        enabled: true,
                         base_topic: "zigbee2mqtt",
                         force_disable_retain: false,
                         include_device_information: false,

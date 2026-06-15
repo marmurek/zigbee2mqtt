@@ -992,4 +992,59 @@ describe("Settings Migration", () => {
             expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining("is not valid JSON"));
         });
     });
+
+    describe("Migrates v5 to v6", () => {
+        const BASE_CONFIG = {
+            version: 5,
+            mqtt: {
+                server: "mqtt://localhost",
+            },
+        };
+
+        beforeEach(() => {
+            settings.testing.CURRENT_VERSION = 6; // stop update after this version
+            data.writeDefaultConfiguration(BASE_CONFIG);
+            settings.reRead();
+        });
+
+        it("adds mqtt.enabled when not present", () => {
+            // @ts-expect-error workaround
+            const beforeSettings = objectAssignDeep.noMutate({}, settings.getPersistedSettings());
+            // @ts-expect-error workaround
+            const afterSettings = objectAssignDeep.noMutate({}, settings.getPersistedSettings());
+            afterSettings.version = 6;
+            afterSettings.mqtt.enabled = true;
+
+            expect(settings.getPersistedSettings()).toStrictEqual(beforeSettings);
+
+            settingsMigration.migrateIfNecessary();
+
+            const migratedSettings = settings.getPersistedSettings();
+            expect(migratedSettings).toStrictEqual(afterSettings);
+
+            const migrationNotes = mockedData.joinPath("migration-5-to-6.log");
+            expect(existsSync(migrationNotes)).toStrictEqual(true);
+            const migrationNotesContent = readFileSync(migrationNotes, "utf8");
+            expect(migrationNotesContent).toContain("[SPECIAL] Added mqtt.enabled option (defaults to true).");
+        });
+
+        it("does not overwrite existing mqtt.enabled when already set to false", () => {
+            settings.set(["mqtt", "enabled"], false);
+
+            // @ts-expect-error workaround
+            const afterSettings = objectAssignDeep.noMutate({}, settings.getPersistedSettings());
+            afterSettings.version = 6;
+
+            settingsMigration.migrateIfNecessary();
+
+            const migratedSettings = settings.getPersistedSettings();
+            expect(migratedSettings).toStrictEqual(afterSettings);
+            expect(migratedSettings.mqtt.enabled).toStrictEqual(false);
+
+            const migrationNotes = mockedData.joinPath("migration-5-to-6.log");
+            expect(existsSync(migrationNotes)).toStrictEqual(true);
+            const migrationNotesContent = readFileSync(migrationNotes, "utf8");
+            expect(migrationNotesContent).not.toContain("[SPECIAL] Added mqtt.enabled option");
+        });
+    });
 });

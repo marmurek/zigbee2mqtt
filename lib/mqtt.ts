@@ -28,6 +28,9 @@ export default class Mqtt {
     public retainedMessages: {[s: string]: {topic: string; payload: string; options: MqttPublishOptions}} = {};
 
     get info() {
+        if (!settings.get().mqtt.enabled) {
+            return {version: undefined, server: ""};
+        }
         return {
             version: this.client.options.protocolVersion,
             server: `${this.client.options.protocol}://${this.client.options.host}:${this.client.options.port}`,
@@ -145,7 +148,7 @@ export default class Mqtt {
 
         // Set timer at interval to check if connected to MQTT server.
         this.connectionTimer = setInterval(() => {
-            if (!this.isConnected()) {
+            if (settings.get().mqtt.enabled && !this.isConnected()) {
                 logger.error("Not connected to MQTT server!");
             }
         }, utils.seconds(10));
@@ -228,7 +231,7 @@ export default class Mqtt {
         this.eventBus.emitMQTTMessagePublished({topic, payload, options: finalOptions});
 
         if (!this.isConnected()) {
-            if (!finalOptions.skipLog) {
+            if (!finalOptions.skipLog && settings.get().mqtt.enabled) {
                 logger.error("Not connected to MQTT server!");
                 logger.error(`Cannot send message: topic: '${topic}', payload: '${payload}`);
             }

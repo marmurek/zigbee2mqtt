@@ -10,7 +10,7 @@ import yaml from "./yaml";
 export {schemaJson};
 // When updating also update:
 // - https://github.com/Koenkk/zigbee2mqtt/blob/dev/data/configuration.example.yaml#L2
-export const CURRENT_VERSION = 5;
+export const CURRENT_VERSION = 6;
 /** NOTE: by order of priority, lower index is lower level (more important) */
 export const LOG_LEVELS: readonly string[] = ["error", "warning", "info", "debug"] as const;
 export type LogLevel = "error" | "warning" | "info" | "debug";
@@ -45,7 +45,9 @@ export const defaults = {
         base_url: "/",
     },
     mqtt: {
+        enabled: true,
         base_topic: "zigbee2mqtt",
+        server: "mqtt://localhost",
         include_device_information: false,
         force_disable_retain: false,
         // 1MB = roughly 3.5KB per device * 300 devices for `/bridge/devices`
@@ -158,6 +160,7 @@ export function writeMinimalDefaults(): void {
     const minimal = {
         version: CURRENT_VERSION,
         mqtt: {
+            enabled: true,
             base_topic: defaults.mqtt.base_topic,
             server: "mqtt://localhost:1883",
         },
