@@ -381,6 +381,27 @@ describe("Controller", () => {
         expect(settings.get().onboarding).toStrictEqual(true);
     });
 
+    it("Start controller with MQTT disabled should be successful", async () => {
+        settings.set(["mqtt", "enabled"], false);
+        settings.set(["frontend", "enabled"], true);
+        await controller.start();
+        await flushPromises();
+        await controller.stop();
+        expect(mockZHController.stop).toHaveBeenCalledTimes(1);
+        expect(mockExit).toHaveBeenCalledTimes(1);
+        expect(mockExit).toHaveBeenCalledWith(0, false);
+    });
+
+    it("Start controller fails due to MQTT and frontend being disabled at the same time", async () => {
+        settings.set(["mqtt", "enabled"], false);
+        settings.set(["frontend", "enabled"], false);
+        await controller.start();
+        await flushPromises();
+        expect(mockLogger.error).toHaveBeenCalledWith("MQTT and Frontend are both disabled, process is unable to start, exiting...");
+        expect(mockExit).toHaveBeenCalledTimes(1);
+        expect(mockExit).toHaveBeenCalledWith(1, false);
+    });
+
     it("Start controller and stop with restart", async () => {
         await controller.start();
         await controller.stop(true);
