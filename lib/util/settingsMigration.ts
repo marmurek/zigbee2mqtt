@@ -28,7 +28,7 @@ interface SettingsCustomHandler extends Omit<SettingsMigration, "path"> {
     execute: (currentSettings: Partial<Settings>) => [validPath: boolean, previousValue: unknown, changed: boolean];
 }
 
-const SUPPORTED_VERSIONS: Settings["version"][] = [undefined, 2, 3, 4, 5, settings.CURRENT_VERSION];
+const SUPPORTED_VERSIONS: Settings["version"][] = [undefined, 2, 3, 4, settings.CURRENT_VERSION];
 
 function backupSettings(version: number): void {
     const filePath = data.joinPath("configuration.yaml");
@@ -532,40 +532,6 @@ function migrateToFive(
     });
 }
 
-function migrateToSix(
-    _currentSettings: Partial<Settings>,
-    transfers: SettingsTransfer[],
-    changes: SettingsChange[],
-    additions: SettingsAdd[],
-    removals: SettingsRemove[],
-    customHandlers: SettingsCustomHandler[],
-): void {
-    transfers.push();
-    changes.push({
-        path: ["version"],
-        note: "Migrated settings to version 6",
-        newValue: 6,
-    });
-    additions.push();
-    removals.push();
-
-    customHandlers.push({
-        note: "Added mqtt.enabled option (defaults to true).",
-        noteIf: () => true,
-        execute: (currentSettings) => {
-            const [validPath, previousValue] = getValue(currentSettings, ["mqtt", "enabled"]);
-
-            if (!validPath) {
-                setValue(currentSettings, ["mqtt", "enabled"], true, true);
-
-                return [true, undefined, true];
-            }
-
-            return [true, previousValue, false];
-        },
-    });
-}
-
 /**
  * Order of execution:
  * - Transfer
@@ -622,10 +588,6 @@ export function migrateIfNecessary(): void {
             migrationNotesFileName = "migration-4-to-5.log";
 
             migrateToFive(currentSettings, transfers, changes, additions, removals, customHandlers);
-        } else if (currentSettings.version === 5) {
-            migrationNotesFileName = "migration-5-to-6.log";
-
-            migrateToSix(currentSettings, transfers, changes, additions, removals, customHandlers);
         }
 
         for (const transfer of transfers) {
