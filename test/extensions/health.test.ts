@@ -312,4 +312,10 @@ describe("Extension: Health", () => {
         });
         expect(calls[0][2]).toStrictEqual({retain: true, qos: 1});
     });
+
+    it("reports mqtt stats as disconnected when MQTT is disabled", async () => {
+        settings.set(["mqtt", "enabled"], false);
+
+        expect(controller.mqtt.stats).toStrictEqual({connected: false, queued: 0});
+    });
 });

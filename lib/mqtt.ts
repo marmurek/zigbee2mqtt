@@ -38,6 +38,9 @@ export default class Mqtt {
     }
 
     get stats() {
+        if (!settings.get().mqtt.enabled) {
+            return {connected: false, queued: 0};
+        }
         return {
             connected: this.isConnected(),
             queued: this.client.queue.length,
