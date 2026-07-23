@@ -18,7 +18,8 @@ import ExtensionOnEvent from "./extension/onEvent";
 import ExtensionOTAUpdate from "./extension/otaUpdate";
 import ExtensionPublish from "./extension/publish";
 import ExtensionReceive from "./extension/receive";
-import Mqtt, {type MqttPublishOptions} from "./mqtt";
+import MessageBus, {type MqttPublishOptions} from "./messageBus";
+import MqttClient from "./mqttClient";
 import State from "./state";
 import type {Zigbee2MQTTAPI} from "./types/api";
 import logger from "./util/logger";
@@ -33,7 +34,8 @@ export class Controller {
     public readonly eventBus: EventBus;
     public readonly zigbee: Zigbee;
     public readonly state: State;
-    public readonly mqtt: Mqtt;
+    public readonly messageBus: MessageBus;
+    private mqttClient: MqttClient;
     private restartCallback: () => Promise<void>;
     private exitCallback: (code: number, restart: boolean) => Promise<void>;
     public readonly extensions: Set<Extension>;
@@ -46,14 +48,15 @@ export class Controller {
         zhcSetLogger(logger);
         this.eventBus = new EventBus();
         this.zigbee = new Zigbee(this.eventBus);
-        this.mqtt = new Mqtt(this.eventBus);
+        this.messageBus = new MessageBus(this.eventBus);
+        this.mqttClient = new MqttClient(this.messageBus);
         this.state = new State(this.eventBus, this.zigbee);
         this.restartCallback = restartCallback;
         this.exitCallback = exitCallback;
         // Initialize extensions.
         this.extensionArgs = [
             this.zigbee,
-            this.mqtt,
+            this.messageBus,
             this.state,
             this.publishEntityState,
             this.eventBus,
@@ -84,6 +87,11 @@ export class Controller {
         if (settings.get().advanced.enable_external_js) {
             this.extensions.add(new ExtensionExternalExtensions(...this.extensionArgs));
         }
+    }
+
+    /** @deprecated Use `messageBus`. Kept for external API compatibility. */
+    get mqtt(): MessageBus {
+        return this.messageBus;
     }
 
     async start(): Promise<void> {
@@ -164,22 +172,17 @@ export class Controller {
 
         logger.info(`Currently ${deviceCount} devices are joined.`);
 
-        // MQTT
+        // The message bus is always available; connecting it to a broker is optional.
         if (settings.get().mqtt.enabled) {
+            this.messageBus.setAdapter(this.mqttClient);
             try {
-                await this.mqtt.connect();
+                await this.mqttClient.connect();
             } catch (error) {
                 logger.error(`MQTT failed to connect, exiting... (${(error as Error).message})`);
+                this.messageBus.setAdapter(undefined);
                 await this.zigbee.stop();
                 return await this.exit(1);
             }
-        } else {
-            if (!settings.get().frontend.enabled) {
-                logger.error("MQTT and Frontend are both disabled, process is unable to start, exiting...");
-                await this.zigbee.stop();
-                return await this.exit(1);
-            }
-            logger.info("MQTT is disabled, skipping connection");
         }
 
         if (abortSignal.aborted) {
@@ -369,9 +372,8 @@ export class Controller {
 
         // Wrap-up
         this.state.stop();
-        if (settings.get().mqtt.enabled) {
-            await this.mqtt.disconnect();
-        }
+        await this.mqttClient.disconnect();
+        this.messageBus.setAdapter(undefined);
 
         try {
             await this.zigbee.stop();
@@ -459,7 +461,7 @@ export class Controller {
         if (!utils.objectIsEmpty(message)) {
             const output = settings.get().advanced.output;
             if (output === "attribute_and_json" || output === "json") {
-                await this.mqtt.publish(entity.name, stringify(message), options);
+                await this.messageBus.publish(entity.name, stringify(message), options);
             }
 
             if (output === "attribute_and_json" || output === "attribute") {
@@ -492,7 +494,7 @@ export class Controller {
             }
 
             if (message !== null) {
-                await this.mqtt.publish(`${topicRoot}${key}`, message, options);
+                await this.messageBus.publish(`${topicRoot}${key}`, message, options);
             }
         }
     }

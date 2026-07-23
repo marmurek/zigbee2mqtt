@@ -314,6 +314,10 @@ export function validate(): string[] {
         }
     }
 
+    if (settingsWithDefaults.homeassistant.enabled && !settingsWithDefaults.mqtt.enabled) {
+        errors.push("homeassistant.enabled requires mqtt.enabled");
+    }
+
     return errors;
 }
 

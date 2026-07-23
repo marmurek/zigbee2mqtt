@@ -838,6 +838,15 @@ describe("Settings", () => {
         expect(settings.validate()).toEqual(expect.arrayContaining([error]));
     });
 
+    it("Should require MQTT when Home Assistant integration is enabled", () => {
+        write(configurationFile, {
+            ...minimalConfig,
+            mqtt: {base_topic: "zigbee2mqtt", enabled: false, server: "localhost"},
+        });
+
+        expect(settings.validate()).toEqual(expect.arrayContaining(["homeassistant.enabled requires mqtt.enabled"]));
+    });
+
     it("Should validate if settings do not conform to scheme", () => {
         write(configurationFile, {
             ...minimalConfig,
